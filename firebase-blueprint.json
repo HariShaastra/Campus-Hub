@@ -1,0 +1,189 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Student profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "college": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "course": { "type": "string" },
+        "year": { "type": "string" },
+        "rating": { "type": "number" },
+        "ratingsCount": { "type": "number" },
+        "transactionsCount": { "type": "number" },
+        "isVerified": { "type": "boolean" },
+        "isAdmin": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "college"]
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "Item or service for sale/exchange",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string", "enum": ["Books & Notes", "Hostel Essentials", "Electronics", "Furniture", "Services", "Miscellaneous"] },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "type": { "type": "string", "enum": ["sale", "exchange", "service"] },
+        "status": { "type": "string", "enum": ["active", "sold", "deleted"] },
+        "isUrgent": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sellerId", "collegeId", "title", "category", "type", "status"]
+    },
+    "AcademicMaterial": {
+      "title": "Academic Material",
+      "description": "Educational resources like notes and manuals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Notes", "Lab Manual", "Question Paper", "Short Notes"] },
+        "fileUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "collegeId", "title", "category", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Reporting inappropriate content for oversight",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["listing", "user", "academic"] },
+        "reason": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "dismissed"] }
+      },
+      "required": ["reporterId", "targetId", "targetType", "reason", "collegeId", "createdAt"]
+    },
+    "UrgentRequest": {
+      "title": "Urgent Request",
+      "description": "Short-term need-now posts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "createdAt", "expiresAt"]
+    },
+    "ChatThread": {
+      "title": "Chat Thread",
+      "description": "Conversation between two users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "listingId": { "type": "string" }
+      },
+      "required": ["participants", "lastMessageAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Individual message in a thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "threadId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["threadId", "senderId", "text", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Rating and feedback for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "targetUserId": { "type": "string" },
+        "reviewerId": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["targetUserId", "reviewerId", "rating", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/listings/{listingId}": {
+      "schema": "Listing",
+      "description": "Marketplace listings"
+    },
+    "/urgentRequests/{requestId}": {
+      "schema": "UrgentRequest",
+      "description": "Urgent campus needs"
+    },
+    "/opportunities/{opportunityId}": {
+      "schema": "Opportunity",
+      "description": "Internships and gigs"
+    },
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Campus activities"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "User ratings"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "In-app notifications"
+    },
+    "/users/{userId}/bookmarks/{bookmarkId}": {
+      "schema": "Bookmark",
+      "description": "User saved items"
+    },
+    "/academicMaterials/{materialId}": {
+      "schema": "AcademicMaterial",
+      "description": "Educational resources"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Content reports for admin oversight"
+    },
+    "/chats/{chatId}": {
+      "schema": "ChatThread",
+      "description": "Active chat threads"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Messages within a chat thread"
+    },
+    "/users/{userId}/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "User reviews and ratings"
+    }
+  }
+}

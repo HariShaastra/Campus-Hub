@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'name', 'college', 'collegeId', 'rating', 'ratingsCount', 'transactionsCount', 'isVerified', 'createdAt'])
+        && data.uid == request.auth.uid
+        && data.email is string && data.email.size() < 256
+        && data.name is string && data.name.size() > 0 && data.name.size() < 128
+        && data.college is string && data.college.size() > 0
+        && data.collegeId is string && data.collegeId.size() > 0
+        && data.rating is number && data.rating >= 0 && data.rating <= 5
+        && data.ratingsCount is int && data.ratingsCount >= 0
+        && data.transactionsCount is int && data.transactionsCount >= 0
+        && data.isVerified is bool
+        && data.createdAt is int;
+    }
+
+    function isValidListing(data) {
+      return data.keys().hasAll(['sellerId', 'collegeId', 'title', 'category', 'type', 'status', 'createdAt', 'updatedAt'])
+        && data.sellerId == request.auth.uid
+        && data.collegeId is string
+        && data.title is string && data.title.size() > 0 && data.title.size() < 200
+        && data.category is string
+        && data.type is string
+        && data.status is string
+        && data.createdAt is int
+        && data.updatedAt is int;
+    }
+
+    function isValidAcademicMaterial(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'collegeId', 'title', 'category', 'createdAt'])
+        && data.authorId == request.auth.uid
+        && data.collegeId is string
+        && data.title is string && data.title.size() > 0
+        && data.category is string
+        && data.createdAt is int;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['reporterId', 'targetId', 'targetType', 'reason', 'collegeId', 'createdAt', 'status'])
+        && data.reporterId == request.auth.uid
+        && data.targetId is string
+        && data.targetType in ['listing', 'user', 'academic']
+        && data.reason is string && data.reason.size() > 0
+        && data.collegeId is string
+        && data.createdAt is int
+        && data.status == 'pending';
+    }
+
+    function isValidUrgentRequest(data) {
+      return data.keys().hasAll(['userId', 'userName', 'collegeId', 'title', 'description', 'createdAt', 'expiresAt'])
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() > 0
+        && data.createdAt is int
+        && data.expiresAt is int;
+    }
+
+    function isValidOpportunity(data) {
+      return data.keys().hasAll(['posterId', 'posterName', 'collegeId', 'title', 'description', 'type', 'createdAt'])
+        && data.title is string && data.title.size() > 0
+        && data.createdAt is int;
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['title', 'description', 'collegeId', 'date', 'location', 'organizer', 'createdAt'])
+        && data.title is string && data.title.size() > 0
+        && data.createdAt is int;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['userId', 'title', 'message', 'type', 'read', 'createdAt'])
+        && data.userId is string
+        && data.read is bool
+        && data.createdAt is int;
+    }
+
+    function isValidBookmark(data) {
+      return data.keys().hasAll(['userId', 'targetId', 'targetType', 'createdAt'])
+        && data.userId == request.auth.uid
+        && data.targetId is string
+        && data.targetType in ['listing', 'academic', 'opportunity']
+        && data.createdAt is int;
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['targetUserId', 'reviewerId', 'reviewerName', 'rating', 'comment', 'createdAt'])
+        && data.reviewerId == request.auth.uid
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && data.createdAt is int;
+    }
+
+    function isValidChatThread(data) {
+       return data.keys().hasAll(['participants', 'participantNames', 'lastMessageAt'])
+        && request.auth.uid in data.participants
+        && data.lastMessageAt is int;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['threadId', 'senderId', 'text', 'createdAt'])
+        && data.senderId == request.auth.uid
+        && data.text is string && data.text.size() > 0
+        && data.createdAt is int;
+    }
+
+    // --- Collection Routes ---
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'college', 'collegeId', 'course', 'year', 'isVerified']);
+      
+      match /bookmarks/{bookmarkId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidBookmark(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      match /reviews/{reviewId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidReview(incoming()) && incoming().targetUserId == userId;
+      }
+    }
+
+    match /listings/{listingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidListing(incoming());
+      allow update: if isSignedIn() && (
+        (isOwner(existing().sellerId) && isValidListing(incoming())) || 
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && incoming().status in ['sold', 'active'])
+      );
+      allow delete: if isOwner(existing().sellerId);
+    }
+
+    match /academicMaterials/{materialId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidAcademicMaterial(incoming());
+      allow delete: if isOwner(existing().authorId) || isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && isValidReport(incoming());
+      allow update: if isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+    }
+
+    match /urgentRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidUrgentRequest(incoming());
+      allow delete: if isOwner(existing().userId) || isAdmin();
+    }
+
+    match /opportunities/{opportunityId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (isSignedIn() && isValidOpportunity(incoming()));
+      allow update, delete: if isAdmin() || (isOwner(existing().posterId));
+    }
+
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (isSignedIn() && isValidEvent(incoming()));
+      allow update, delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && existing().userId == request.auth.uid;
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow create: if isSignedIn(); // Allow app components to trigger notifications
+    }
+
+    match /chats/{chatId} {
+      allow read: if isSignedIn() && request.auth.uid in existing().participants;
+      allow create: if isSignedIn() && isValidChatThread(incoming());
+      allow update: if isSignedIn() && request.auth.uid in existing().participants 
+        && incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'lastMessageAt']);
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants && isValidChatMessage(incoming());
+      }
+    }
+  }
+}
